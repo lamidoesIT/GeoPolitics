@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GEOPOLITICS 2027 | UCT INF4001N Tactical Command</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans" x-data="geopoliticsApp()" x-init="init()">
+
+  <!-- TOP NAVIGATION BAR -->
+  <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <span class="px-2.5 py-1 rounded bg-amber-500/20 text-amber-400 font-bold text-xs border border-amber-500/40">UCT INF4001N</span>
+        <h1 class="text-xl font-extrabold tracking-tight text-white">GEOPOLITICS: WORLD CONQUEST</h1>
+      </div>
+
+      <nav class="flex items-center gap-2 text-sm">
+        <button @click="view = 'lobby'; loadGames()" :class="view === 'lobby' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300'" class="px-3 py-1.5 rounded-lg font-medium transition">Command Lobby</button>
+        <button x-show="activeGame" @click="view = 'warroom'" :class="view === 'warroom' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300'" class="px-3 py-1.5 rounded-lg font-medium transition">Active War Room</button>
+        <button @click="view = 'analytics'; loadAnalytics()" :class="view === 'analytics' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300'" class="px-3 py-1.5 rounded-lg font-medium transition">Platform Analytics</button>
+      </nav>
+
+      <!-- Auth Status -->
+      <div class="flex items-center gap-3 text-sm">
+        <template x-if="currentUser">
+          <div class="flex items-center gap-3">
+            <span class="text-emerald-400 font-semibold">Commander: <span x-text="currentUser"></span></span>
+            <button @click="logout()" class="px-3 py-1 rounded bg-rose-600/20 text-rose-300 border border-rose-500/30 hover:bg-rose-600/30">Logout</button>
+          </div>
+        </template>
+        <template x-if="!currentUser">
+          <span class="text-amber-400 text-xs px-2.5 py-1 rounded bg-amber-500/10 border border-amber-500/30">Spectator Mode (Sign in to Play)</span>
+        </template>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-6">
+    <!-- ERROR / NOTIFICATION BANNER -->
+    <div x-show="errorMsg" x-transition class="mb-4 p-3 rounded-lg bg-rose-900/50 border border-rose-500 text-rose-200 flex justify-between items-center text-sm">
+      <span x-text="errorMsg"></span>
+      <button @click="errorMsg = ''" class="text-rose-300 font-bold">✕</button>
+    </div>
+
+    <!-- VIEW 1: LOBBY, AUTH, SEARCH & FILTER -->
+    <section x-show="view === 'lobby'" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Left Column: Auth or Start New Game -->
+      <div class="space-y-6">
+        <div x-show="!currentUser" class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <h2 class="text-lg font-bold mb-3 text-white">Commander Authentication</h2>
+          <p class="text-xs text-slate-400 mb-4">Visitors can spectate any game via shared URL, but you must be logged in to command a nation or execute turns.</p>
+          <input x-model="authForm.username" type="text" placeholder="Username" class="w-full mb-3 px-3 py-2 rounded bg-slate-950 border border-slate-700 text-sm" />
+          <input x-model="authForm.password" type="password" placeholder="Password (min 6 chars)" class="w-full mb-4 px-3 py-2 rounded bg-slate-950 border border-slate-700 text-sm" />
+          <div class="flex gap-2">
+            <button @click="login()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 py-2 rounded font-semibold text-sm">Login</button>
+            <button @click="signup()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 py-2 rounded font-semibold text-sm">Sign Up</button>
+          </div>
+        </div>
+
+        <!-- Country Selection & Search/Filter (Rubric: Lists, Searching, Filtering) -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <h2 class="text-lg font-bold mb-2 text-white">Launch New Geopolitics Campaign</h2>
+          <p class="text-xs text-slate-400 mb-3">Select your starting nation. 9 rival NPC nations will be randomly mobilized based on Worldometer population brackets.</p>
+
+          <div class="flex gap-2 mb-3">
+            <input x-model="countrySearch" @input="loadCountries()" type="text" placeholder="Search country..." class="flex-1 px-3 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs" />
+            <select x-model="countryMinTier" @change="loadCountries()" class="px-2 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs">
+              <option value="1">All Tiers (1-9)</option>
+              <option value="5">5+ Soldiers (>=50M)</option>
+              <option value="8">8+ Soldiers (>=125M)</option>
+            </select>
+          </div>
+
+          <div class="max-h-64 overflow-y-auto space-y-1.5 pr-1 mb-4">
+            <template x-for="c in countries" :key="c.name">
+              <div @click="selectedCountry = c.name"
+                   :class="selectedCountry === c.name ? 'border-indigo-500 bg-indigo-950/50' : 'border-slate-800 bg-slate-950/60'"
+                   class="p-2.5 rounded-lg border cursor-pointer flex justify-between items-center text-xs hover:border-slate-600">
+                <div>
+                  <div class="font-bold text-slate-100" x-text="c.name"></div>
+                  <div class="text-slate-400" x-text="'Pop: ' + c.population.toLocaleString()"></div>
+                </div>
+                <span class="px-2 py-1 rounded bg-emerald-500/20 text-emerald-300 font-bold" x-text="c.base_soldiers + ' Soldiers'"></span>
+              </div>
+            </template>
+          </div>
+
+          <button @click="startNewGame()" :disabled="!currentUser || !selectedCountry"
+                  class="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 font-bold text-sm">
+            Deploy Campaign (<span x-text="selectedCountry || 'Select Nation'"></span>)
+          </button>
+        </div>
+      </div>
+
+      <!-- Right 2 Columns: Multi-Session Browser & Spectator Links -->
+      <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-5">
+        <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+          <h2 class="text-lg font-bold text-white">Campaign Sessions Directory (Multi-Session Support)</h2>
+          <div class="flex gap-2 text-xs">
+            <input x-model="sessionSearch" @input="loadGames()" placeholder="Filter by country..." class="px-3 py-1.5 rounded bg-slate-950 border border-slate-700" />
+            <select x-model="sessionStatusFilter" @change="loadGames()" class="px-2.5 py-1.5 rounded bg-slate-950 border border-slate-700">
+              <option value="ALL">All Statuses</option>
+              <option value="ACTIVE">Active Wars</option>
+              <option value="COMPLETED">Completed</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          <template x-for="g in gamesList" :key="g.game_id">
+            <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-wrap justify-between items-center gap-4">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="font-bold text-white text-sm" x-text="g.player_country + ' Campaign'"></span>
+                  <span :class="g.status === 'ACTIVE' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'"
+                        class="px-2 py-0.5 rounded text-[11px] font-bold" x-text="g.status"></span>
+                </div>
+                <div class="text-xs text-slate-400 mt-1">
+                  Commander: <span class="text-slate-200" x-text="g.owner_username"></span> |
+                  Round: <span class="text-slate-200" x-text="g.round_number"></span> |
+                  Turn: <span class="text-indigo-400" x-text="g.current_turn_player_id"></span>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button @click="openGame(g.game_id)" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-bold">
+                  <span x-text="currentUser === g.owner_username ? 'Resume Command' : 'Spectate Live'"></span>
+                </button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 2: ACTIVE WAR ROOM -->
+    <section x-show="view === 'warroom' && activeGame" class="space-y-6">
+      <!-- Top Tactical Status Bar -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-wrap justify-between items-center gap-4">
+        <div class="flex items-center gap-6">
+          <div>
+            <div class="text-xs text-slate-400">ROUND</div>
+            <div class="text-2xl font-black text-white" x-text="activeGame?.round_number"></div>
+          </div>
+          <div>
+            <div class="text-xs text-slate-400">ACTIVE TURN</div>
+            <div class="text-lg font-bold text-amber-400" x-text="activeGame?.current_turn_player_id"></div>
+          </div>
+          <div x-show="activeGame?.pending_reinforcements > 0 && activeGame?.current_turn_player_id === 'HUMAN_1'">
+            <div class="text-xs text-emerald-400 font-bold">REINFORCEMENTS READY</div>
+            <div class="text-lg font-black text-emerald-300" x-text="'+' + activeGame?.pending_reinforcements + ' Soldiers'"></div>
+          </div>
+        </div>
+
+        <!-- Fast Forward & Share Controls -->
+        <div class="flex items-center gap-3">
+          <button @click="copyShareLink()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold border border-slate-700">
+            🔗 Copy Spectator Link
+          </button>
+          <template x-if="activeGame?.can_play && activeGame?.status === 'ACTIVE'">
+            <div class="flex items-center gap-2">
+              <button @click="toggleFastForward()"
+                      :class="fastForward ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-amber-300 border border-amber-500/40'"
+                      class="px-3 py-1.5 rounded-lg text-xs font-extrabold transition">
+                ⏩ Fast-Forward NPCs: <span x-text="fastForward ? 'ON (250ms)' : 'OFF (1.5s)'"></span>
+              </button>
+              <button x-show="activeGame?.current_turn_player_id !== 'HUMAN_1'"
+                      @click="stepNpcTurn()"
+                      class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-bold">
+                Step Next NPC Move
+              </button>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- 10 COUNTRIES VISIBILITY GRID -->
+      <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <template x-for="t in activeGame?.territories" :key="t.name">
+          <div :class="t.owner_id === 'HUMAN_1' ? 'border-emerald-500/70 bg-emerald-950/20' : 'border-slate-800 bg-slate-900'"
+               class="p-3.5 rounded-xl border flex flex-col justify-between">
+            <div>
+              <div class="flex justify-between items-start gap-1">
+                <span class="font-extrabold text-sm text-white" x-text="t.name"></span>
+                <span :class="t.owner_id === 'HUMAN_1' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'"
+                      class="px-1.5 py-0.5 rounded text-[10px] font-bold" x-text="t.owner_id"></span>
+              </div>
+              <div class="text-[11px] text-slate-400 mt-1" x-text="'Base Value: ' + t.base_value + ' | Reward: +' + Math.max(2, Math.floor(t.base_value/2))"></div>
+            </div>
+            <div class="mt-3 pt-2 border-t border-slate-800/80 flex justify-between items-center">
+              <span class="text-xs text-slate-400">Garrison</span>
+              <span class="text-lg font-black text-amber-400" x-text="t.soldiers + ' 🪖'"></span>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- COMMAND CONSOLE (ONLY ACTIVE FOR LOGGED-IN OWNER ON HUMAN TURN) -->
+      <div x-show="activeGame?.can_play && activeGame?.current_turn_player_id === 'HUMAN_1' && activeGame?.status === 'ACTIVE'"
+           class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+        <!-- 1. Reinforcements Panel (Round 2+) -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+          <h3 class="font-bold text-sm text-emerald-400 mb-2">1. Allocate Reinforcements (Round 2+)</h3>
+          <p class="text-xs text-slate-400 mb-3">Receive 2 soldiers per controlled country at the start of your turn.</p>
+          <select x-model="reinfForm.country" class="w-full mb-2 px-3 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs">
+            <option value="">Select Controlled Country...</option>
+            <template x-for="t in myTerritories()" :key="t.name">
+              <option :value="t.name" x-text="t.name + ' (' + t.soldiers + ' soldiers)'"></option>
+            </template>
+          </select>
+          <input x-model.number="reinfForm.amount" type="number" min="1" :max="activeGame?.pending_reinforcements" class="w-full mb-2 px-3 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs" />
+          <button @click="submitReinforce()" :disabled="activeGame?.pending_reinforcements <= 0"
+                  class="w-full py-2 rounded bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-xs font-bold">
+            Deploy Reinforcements (<span x-text="activeGame?.pending_reinforcements"></span> left)
+          </button>
+        </div>
+
+        <!-- 2. Tactical Transfer Panel -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+          <h3 class="font-bold text-sm text-indigo-400 mb-2">2. Transfer Soldiers Between Nations</h3>
+          <p class="text-xs text-slate-400 mb-2">Allowed when no attack is in progress. Source country must keep >= 1 soldier.</p>
+          <div class="grid grid-cols-2 gap-2 mb-2">
+            <select x-model="transferForm.from" class="px-2 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs">
+              <option value="">From...</option>
+              <template x-for="t in myTerritories()" :key="t.name">
+                <option :value="t.name" x-text="t.name + ' (' + t.soldiers + ')'"></option>
+              </template>
+            </select>
+            <select x-model="transferForm.to" class="px-2 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs">
+              <option value="">To...</option>
+              <template x-for="t in myTerritories()" :key="t.name">
+                <option :value="t.name" x-text="t.name + ' (' + t.soldiers + ')'"></option>
+              </template>
+            </select>
+          </div>
+          <input x-model.number="transferForm.amount" type="number" min="1" placeholder="Soldiers to transfer" class="w-full mb-2 px-3 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs" />
+          <button @click="submitTransfer()" :disabled="activeGame?.active_attack !== null"
+                  class="w-full py-2 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-xs font-bold">
+            Execute Transfer
+          </button>
+        </div>
+
+        <!-- 3. Attack & Dice Combat Panel -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+          <h3 class="font-bold text-sm text-rose-400 mb-2">3. Launch / Continue Attack (1 Target/Turn)</h3>
+          <div class="grid grid-cols-2 gap-2 mb-2">
+            <select x-model="attackForm.attacker" :disabled="activeGame?.active_attack !== null" class="px-2 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs">
+              <option value="">Attack From...</option>
+              <template x-for="t in myTerritories()" :key="t.name">
+                <option :value="t.name" x-text="t.name + ' (' + t.soldiers + ')'"></option>
+              </template>
+            </select>
+            <select x-model="attackForm.defender" :disabled="activeGame?.active_attack !== null" class="px-2 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs">
+              <option value="">Target Enemy...</option>
+              <template x-for="t in enemyTerritories()" :key="t.name">
+                <option :value="t.name" x-text="t.name + ' (' + t.soldiers + ')'"></option>
+              </template>
+            </select>
+          </div>
+          <div class="flex gap-2 mb-2">
+            <button @click="rollAttackDice()" :disabled="activeGame?.attack_used_this_turn && !activeGame?.active_attack"
+                    class="flex-1 py-2 rounded bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-xs font-bold">
+              🎲 Roll Combat Dice
+            </button>
+            <button x-show="activeGame?.active_attack" @click="stopAttack()"
+                    class="px-3 py-2 rounded bg-amber-600 hover:bg-amber-500 text-xs font-bold">
+              Halt & End Turn
+            </button>
+          </div>
+          <button @click="endHumanTurn()" class="w-full py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200">
+            Skip / End Turn
+          </button>
+        </div>
+      </div>
+
+      <!-- LIVE VISUAL DICE PAIRING & AI BATTLE COMMENTARY -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <h3 class="text-sm font-bold text-amber-400 uppercase tracking-wider mb-3">Live 1-to-1 Soldier Dice Pairing Visualizer</h3>
+          <template x-if="lastDicePhase">
+            <div class="space-y-3">
+              <div class="text-xs text-slate-300 font-semibold">
+                <span class="text-emerald-400" x-text="lastDicePhase.attacker_country"></span> vs
+                <span class="text-rose-400" x-text="lastDicePhase.defender_country"></span>
+                (<span x-text="lastDicePhase.num_dice + ' Dice Rolled'"></span>)
+              </div>
+              <div class="space-y-2">
+                <template x-for="p in lastDicePhase.pairings" :key="p.soldier_pair">
+                  <div class="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex justify-between items-center text-xs">
+                    <span class="font-bold text-slate-400" x-text="'Soldier Pair #' + p.soldier_pair"></span>
+                    <div class="flex items-center gap-3">
+                      <span class="px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-300 font-black" x-text="'Attacker Die: ' + p.attacker_die"></span>
+                      <span class="text-slate-500 font-bold">VS</span>
+                      <span class="px-2.5 py-1 rounded bg-rose-500/20 text-rose-300 font-black" x-text="'Defender Die: ' + p.defender_die"></span>
+                    </div>
+                    <span :class="p.outcome === 'ATTACKER_WIN' ? 'text-emerald-400' : (p.outcome === 'DEFENDER_WIN' ? 'text-rose-400' : 'text-amber-400')"
+                          class="font-bold" x-text="p.outcome"></span>
+                  </div>
+                </template>
+              </div>
+              <div class="p-3 rounded-lg bg-indigo-950/40 border border-indigo-500/40 text-xs text-indigo-200 leading-relaxed"
+                   x-text="lastDicePhase.ai_commentary"></div>
+            </div>
+          </template>
+          <template x-if="!lastDicePhase">
+            <p class="text-xs text-slate-500 italic">Initiate an attack or step an NPC turn to view live paired dice rolls and AI war-correspondent commentary.</p>
+          </template>
+        </div>
+
+        <!-- NPC AI JUSTIFICATIONS & BATTLE CHRONICLE -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <h3 class="text-sm font-bold text-indigo-400 uppercase tracking-wider mb-3">AI Battle Commentary & NPC Decision Justifications</h3>
+          <div class="max-h-72 overflow-y-auto space-y-2.5 pr-1">
+            <template x-for="(ev, idx) in activeGame?.event_feed" :key="idx">
+              <div class="p-3 rounded-lg bg-slate-950 border border-slate-800 text-xs">
+                <div class="flex justify-between text-[11px] text-slate-400 mb-1">
+                  <span class="font-bold text-amber-400" x-text="ev.title"></span>
+                  <span x-text="new Date(ev.timestamp).toLocaleTimeString()"></span>
+                </div>
+                <p class="text-slate-200 leading-relaxed" x-text="ev.detail"></p>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 3: BONUS FEATURE - PLATFORM & PLAYER ANALYTICS -->
+    <section x-show="view === 'analytics'" class="bg-slate-900 border border-slate-800 rounded-xl p-6">
+      <h2 class="text-lg font-bold text-white mb-4">Platform & Commander Analytics (Bonus Feature)</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div class="p-4 rounded-xl bg-slate-950 border border-slate-800">
+          <div class="text-xs text-slate-400">Total Campaigns Initialized</div>
+          <div class="text-3xl font-black text-white mt-1" x-text="analyticsData.total_games || 0"></div>
+        </div>
+        <div class="p-4 rounded-xl bg-slate-950 border border-slate-800">
+          <div class="text-xs text-slate-400">Active Global Theatres</div>
+          <div class="text-3xl font-black text-emerald-400 mt-1" x-text="analyticsData.active_games || 0"></div>
+        </div>
+        <div class="p-4 rounded-xl bg-slate-950 border border-slate-800">
+          <div class="text-xs text-slate-400">Completed World Conquests</div>
+          <div class="text-3xl font-black text-amber-400 mt-1" x-text="analyticsData.completed_games || 0"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    function geopoliticsApp() {
+      return {
+        view: 'lobby',
+        currentUser: null,
+        errorMsg: '',
+        authForm: { username: '', password: '' },
+        countries: [],
+        countrySearch: '',
+        countryMinTier: 1,
+        selectedCountry: 'South Africa',
+        gamesList: [],
+        sessionSearch: '',
+        sessionStatusFilter: 'ALL',
+        activeGame: null,
+        lastDicePhase: null,
+        fastForward: false,
+        npcTimer: null,
+        reinfForm: { country: '', amount: 2 },
+        transferForm: { from: '', to: '', amount: 1 },
+        attackForm: { attacker: '', defender: '' },
+        analyticsData: {},
+
+        async init() {
+          await this.checkAuth();
+          await this.loadCountries();
+          await this.loadGames();
+          const params = new URLSearchParams(window.location.search);
+          if (params.get('game_id')) {
+            await this.openGame(params.get('game_id'));
+          }
+        },
+        async checkAuth() {
+          const res = await fetch('/api/auth/me');
+          const data = await res.json();
+          this.currentUser = data.username;
+        },
+        async login() {
+          this.errorMsg = '';
+          const res = await fetch('/api/auth/login', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(this.authForm)
+          });
+          const data = await res.json();
+          if (!res.ok) { this.errorMsg = data.error; return; }
+          this.currentUser = data.username;
+          await this.loadGames();
+        },
+        async signup() {
+          this.errorMsg = '';
+          const res = await fetch('/api/auth/signup', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(this.authForm)
+          });
+          const data = await res.json();
+          if (!res.ok) { this.errorMsg = data.error; return; }
+          this.currentUser = data.username;
+          await this.loadGames();
+        },
+        async logout() {
+          await fetch('/api/auth/logout', { method: 'POST' });
+          this.currentUser = null;
+        },
+        async loadCountries() {
+          const res = await fetch(`/api/countries?search=${encodeURIComponent(this.countrySearch)}&min_tier=${this.countryMinTier}`);
+          this.countries = await res.json();
+        },
+        async loadGames() {
+          const res = await fetch(`/api/games?status=${this.sessionStatusFilter}&search=${encodeURIComponent(this.sessionSearch)}`);
+          this.gamesList = await res.json();
+        },
+        async loadAnalytics() {
+          const res = await fetch('/api/analytics');
+          this.analyticsData = await res.json();
+        },
+        async startNewGame() {
+          this.errorMsg = '';
+          const res = await fetch('/api/games/new', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ country_name: this.selectedCountry })
+          });
+          const data = await res.json();
+          if (!res.ok) { this.errorMsg = data.error; return; }
+          await this.openGame(data.game_id);
+        },
+        async openGame(gameId) {
+          const res = await fetch(`/api/games/${gameId}`);
+          const data = await res.json();
+          if (!res.ok) { this.errorMsg = data.error; return; }
+          this.activeGame = data;
+          this.view = 'warroom';
+          window.history.replaceState({}, '', `?game_id=${gameId}`);
+          this.scheduleNpcAutoSimulation();
+        },
+        myTerritories() {
+          return (this.activeGame?.territories || []).filter(t => t.owner_id === 'HUMAN_1');
+        },
+        enemyTerritories() {
+          return (this.activeGame?.territories || []).filter(t => t.owner_id !== 'HUMAN_1');
+        },
+        async submitReinforce() {
+          const res = await fetch(`/api/games/${this.activeGame.game_id}/reinforce`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ country_name: this.reinfForm.country, amount: this.reinfForm.amount })
+          });
+          const data = await res.json();
+          if (!res.ok) { this.errorMsg = data.error; return; }
+          this.activeGame = data;
+        },
+        async submitTransfer() {
+          const res = await fetch(`/api/games/${this.activeGame.game_id}/transfer`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              from_country: this.transferForm.from,
+              to_country: this.transferForm.to,
+              amount: this.transferForm.amount
+            })
+          });
+          const data = await res.json();
+          if (!res.ok) { this.errorMsg = data.error; return; }
+          this.activeGame = data;
+        },
+        async rollAttackDice() {
+          const res = await fetch(`/api/games/${this.activeGame.game_id}/attack-roll`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              attacker_country: this.attackForm.attacker,
+              defender_country: this.attackForm.defender
+            })
+          });
+          const data = await res.json();
+          if (!res.ok) { this.errorMsg = data.error; return; }
+          this.activeGame = data.game;
+          this.lastDicePhase = data.battle_phase;
+        },
+        async stopAttack() {
+          const res = await fetch(`/api/games/${this.activeGame.game_id}/stop-attack`, { method: 'POST' });
+          this.activeGame = await res.json();
+          this.scheduleNpcAutoSimulation();
+        },
+        async endHumanTurn() {
+          const res = await fetch(`/api/games/${this.activeGame.game_id}/end-turn`, { method: 'POST' });
+          this.activeGame = await res.json();
+          this.scheduleNpcAutoSimulation();
+        },
+        toggleFastForward() {
+          this.fastForward = !this.fastForward;
+          this.scheduleNpcAutoSimulation();
+        },
+        scheduleNpcAutoSimulation() {
+          if (this.npcTimer) clearTimeout(this.npcTimer);
+          if (!this.activeGame || !this.activeGame.can_play || this.activeGame.status !== 'ACTIVE') return;
+          if (this.activeGame.current_turn_player_id !== 'HUMAN_1') {
+            const delay = this.fastForward ? 250 : 1500;
+            this.npcTimer = setTimeout(() => this.stepNpcTurn(), delay);
+          }
+        },
+        async stepNpcTurn() {
+          if (!this.activeGame || this.activeGame.current_turn_player_id === 'HUMAN_1') return;
+          const res = await fetch(`/api/games/${this.activeGame.game_id}/simulate-npc`, { method: 'POST' });
+          const data = await res.json();
+          if (res.ok) {
+            this.activeGame = data;
+            if (data.event_feed?.[0]?.dice_data) {
+              this.lastDicePhase = data.event_feed[0].dice_data;
+            }
+            this.scheduleNpcAutoSimulation();
+          }
+        },
+        copyShareLink() {
+          navigator.clipboard.writeText(window.location.href);
+          alert('Spectator URL copied! Anyone with this link can view the live game board.');
+        }
+      }
+    }
+  </script>
+</body>
+</html>
